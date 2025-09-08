@@ -70,56 +70,6 @@ fail指针与KMP的next数组相比区别如下</p>
       </tags>
   </entry>
   <entry>
-    <title>Audio Session编程指南(二)</title>
-    <url>/2022/03/20/Audio-Session%E7%BC%96%E7%A8%8B%E6%8C%87%E5%8D%97-%E4%BA%8C/</url>
-    <content><![CDATA[<h2 id="一-audio-session的默认行为"><a class="markdownIt-Anchor" href="#一-audio-session的默认行为"></a> 一、Audio Session的默认行为</h2>
-<ul>
-<li>可以播放，但不能进行录制；</li>
-<li>静音开关设置为静音模式的时候，这个App的任何的音频播放都会被设置为静音；</li>
-<li>当设备锁屏时，这个app的音频会被静音；</li>
-<li>当App播放音频时，其他在后台播放的音频都会被静音；</li>
-</ul>
-<h2 id="二-配置audio-session"><a class="markdownIt-Anchor" href="#二-配置audio-session"></a> 二、配置Audio Session</h2>
-<p>在categories设置了Audio最基本的行为的同时，可以通过设置category的mode更进一步的设置Audio的行为。例如拥有Voice over IP (VoIP)功能的App，它会在使用<code>AVAudioSessionCategoryPlayAndRecord</code>的同时，将Audio Session的mode也设置为<code>AVAudioSessionModeVoiceChat</code>，这样可以通过系统级别的数字信号处理使音频信号得到提升。<br />
-某些categories支持使用设置options重写category默认的Audio行为，举例来讲，Category为<code>AVAudioSessionCategoryPlayback</code>的Audio Session 在active的时候，会打断系统其他的Audio，大多数场景我们都需要这样的表现，但是如果想和系统其他音频进行混播，可以通过设置Category的options为<code>AVAudioSessionCategoryOptionMixWithOthers</code>来进行实现，使用的方法为<code> setCategory:mode:options:error:</code>。</p>
-<h2 id="三-冲突的音频需求"><a class="markdownIt-Anchor" href="#三-冲突的音频需求"></a> 三、冲突的音频需求</h2>
-<p>同一时间内可能有多个app需要使用Audio device，系统这里做了一个比较形象的比。将使用Audio Device比作机场的跑道，将app比作正在飞机，系统服务作为塔台:<br />
-<img src="/images/audio/competing_audio_demands.png" width="600"/><br />
-图中，第一步，你的App请求激活audio session；第二步，系统会判断你配置的category，这里你的app要求其他App进行静音；第三步和第四部，系统deactivates了音乐App的Audio Session，停止了它的音频播放；最后，系统激活了你的audio session，然后你就可以开始播放了；</p>
-<h2 id="四-audio-session的激活和释放"><a class="markdownIt-Anchor" href="#四-audio-session的激活和释放"></a> 四、Audio Session的激活和释放</h2>
-<p>虽然AVFoundation的播放和录音会自动激活Audio Session，但是手动激活可以让你知道active audio session是否成功。<br />
-闹钟、来电或者日历提醒的时候，系统会将你的App deactive掉，当用户dismiss或者挂断电话后，系统允许app再次active audio session，这个时候你可以决定是否将自己的AudioSession进行激活。</p>
-<p>激活AudioSession的方法如下</p>
-<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line"><span class="comment">// Configure your audio session category, options, and mode</span></span><br><span class="line">[[<span class="built_in">AVAudioSession</span> sharedInstance] setCategory:<span class="built_in">AVAudioSessionCategoryPlayback</span> withOptions:<span class="number">0</span> error:<span class="literal">nil</span>];</span><br><span class="line"></span><br><span class="line"><span class="comment">// Activate your audio session to enable your custom configuration</span></span><br><span class="line"><span class="built_in">NSError</span> *outError = <span class="literal">nil</span>;</span><br><span class="line"><span class="type">BOOL</span> ret = [[<span class="built_in">AVAudioSession</span> sharedInstance] setActive:<span class="literal">YES</span> error:&amp;outError];</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-<p>可以将<code>setActive</code> 的参数设置为NO来释放AudioSession。除了一些VoIP、录音这些App，大多数App并不需要对AudioSession进行显式的释放。</p>
-<blockquote>
-<p>对拥有VoIP功能的App，要确保在后台待机运行的情况下不激活AudioSession，确保只有收到呼叫的时候才激活AudioSession；</p>
-<p>对于使用recording category的App，要确保只有它在录音的时候才处于激活状态。在录音前和录音结束后，要将AudioSession设置为未激活态，这样其他功能的音频提示、消息才能被正确播放出来；</p>
-</blockquote>
-<h2 id="五-处理中断"><a class="markdownIt-Anchor" href="#五-处理中断"></a> 五、处理中断</h2>
-<p>为了让App的可以在AudioSesson被电话呼叫、闹钟和其他App的Active事件打断后正常工作，我们需要去监听AudioSession的打断事件。音频的打断来自于那些被激活且未配置mix with others的AudioSession，打断会使我们的AudioSession处于未激活状态，然后结束我们对Audio的使用。</p>
- <img src="/images/audio/audio_session_interrupted.png" width="600"/>
-<p>以上图片演示了一个播放应用程序的AudioSessionz在中断之前、期间和之后的事件序列。</p>
-<p>可以使用<code>AVAudioSessionInterruptionNotification</code> 来监听AudioSession的变化：</p>
-<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line">[[<span class="built_in">NSNotificationCenter</span> defaultCenter] addObserver:<span class="keyword">self</span> selector:<span class="keyword">@selector</span>(handleInterruption:) name:<span class="built_in">AVAudioSessionInterruptionNotification</span> object:[<span class="built_in">AVAudioSession</span> sharedInstance]];</span><br></pre></td></tr></table></figure>
-<p>在interrupt begin和interrupt end的时候做对应处理，当interruptType为<code>AVAudioSessionInterruptionTypeEnded</code>时，可以从userInfo中通过<code>AVAudioSessionInterruptionOptionKey</code>拿到option，当option的值为<code>AVAudioSessionInterruptionOptionShouldResume</code>时，可以重新激活AudioSession并开始进行record或者play。</p>
-<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line">- (<span class="type">void</span>)handleInterruption:(<span class="built_in">NSNotification</span> *)notification &#123;</span><br><span class="line">    <span class="built_in">NSDictionary</span> *info = notification.userInfo;</span><br><span class="line">    <span class="built_in">AVAudioSessionInterruptionType</span> interruptType = [info[<span class="built_in">AVAudioSessionInterruptionTypeKey</span>] unsignedIntegerValue];</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (interruptType == <span class="built_in">AVAudioSessionInterruptionTypeBegan</span>) &#123;</span><br><span class="line">        <span class="comment">// Interruption began, take appropriate actions (save state, update user interface)</span></span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (interruptType == <span class="built_in">AVAudioSessionInterruptionTypeEnded</span>) &#123;</span><br><span class="line">        <span class="built_in">AVAudioSessionInterruptionOptions</span> option = [info[<span class="built_in">AVAudioSessionInterruptionOptionKey</span>] unsignedIntegerValue];</span><br><span class="line">        <span class="keyword">if</span> (option == <span class="built_in">AVAudioSessionInterruptionOptionShouldResume</span>) &#123;</span><br><span class="line">            <span class="comment">// reactive audio session &amp; play</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h2 id="六-响应媒体服务重置"><a class="markdownIt-Anchor" href="#六-响应媒体服务重置"></a> 六、响应媒体服务重置</h2>
-<p>媒体服务通过共享服务进程来提供音频和其他多媒体功能。虽然很罕见，但是在你的App处于active的时候，媒体服务重置的情况还是有可能发生的。可以通过注册 <code>AVAudioSessionMediaServicesWereResetNotification</code> 来监听媒体服务被重置的情况。当这种情况发生时，你需要做一些处理:</p>
-<ul>
-<li>清理之前的audio对象（例如players、recorders、converters和audio queue），重新创建一个新的；</li>
-<li>重置所有正在跟踪的内部音频状态，包括AVAudioSession的所有属性；</li>
-<li>适当时，使用setActive:error:方法重新激活AVAudioSession实例；</li>
-</ul>
-<blockquote>
-<p>Apps 无需重新注册AudioSession的notification，无需对AudioSession的属性进行 key-value 监控进行重置；</p>
-</blockquote>
-]]></content>
-      <tags>
-        <tag>音视频</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>Audio Session编程指南(一)</title>
     <url>/2022/03/20/Audio-Session%E7%BC%96%E7%A8%8B%E6%8C%87%E5%8D%97-%E4%B8%80/</url>
     <content><![CDATA[<h2 id="一-介绍"><a class="markdownIt-Anchor" href="#一-介绍"></a> 一、介绍</h2>
@@ -243,6 +193,56 @@ USB and headphones、HDMI and headphones、LineOut and headphones，另外只支
       </tags>
   </entry>
   <entry>
+    <title>Audio Session编程指南(二)</title>
+    <url>/2022/03/20/Audio-Session%E7%BC%96%E7%A8%8B%E6%8C%87%E5%8D%97-%E4%BA%8C/</url>
+    <content><![CDATA[<h2 id="一-audio-session的默认行为"><a class="markdownIt-Anchor" href="#一-audio-session的默认行为"></a> 一、Audio Session的默认行为</h2>
+<ul>
+<li>可以播放，但不能进行录制；</li>
+<li>静音开关设置为静音模式的时候，这个App的任何的音频播放都会被设置为静音；</li>
+<li>当设备锁屏时，这个app的音频会被静音；</li>
+<li>当App播放音频时，其他在后台播放的音频都会被静音；</li>
+</ul>
+<h2 id="二-配置audio-session"><a class="markdownIt-Anchor" href="#二-配置audio-session"></a> 二、配置Audio Session</h2>
+<p>在categories设置了Audio最基本的行为的同时，可以通过设置category的mode更进一步的设置Audio的行为。例如拥有Voice over IP (VoIP)功能的App，它会在使用<code>AVAudioSessionCategoryPlayAndRecord</code>的同时，将Audio Session的mode也设置为<code>AVAudioSessionModeVoiceChat</code>，这样可以通过系统级别的数字信号处理使音频信号得到提升。<br />
+某些categories支持使用设置options重写category默认的Audio行为，举例来讲，Category为<code>AVAudioSessionCategoryPlayback</code>的Audio Session 在active的时候，会打断系统其他的Audio，大多数场景我们都需要这样的表现，但是如果想和系统其他音频进行混播，可以通过设置Category的options为<code>AVAudioSessionCategoryOptionMixWithOthers</code>来进行实现，使用的方法为<code> setCategory:mode:options:error:</code>。</p>
+<h2 id="三-冲突的音频需求"><a class="markdownIt-Anchor" href="#三-冲突的音频需求"></a> 三、冲突的音频需求</h2>
+<p>同一时间内可能有多个app需要使用Audio device，系统这里做了一个比较形象的比。将使用Audio Device比作机场的跑道，将app比作正在飞机，系统服务作为塔台:<br />
+<img src="/images/audio/competing_audio_demands.png" width="600"/><br />
+图中，第一步，你的App请求激活audio session；第二步，系统会判断你配置的category，这里你的app要求其他App进行静音；第三步和第四部，系统deactivates了音乐App的Audio Session，停止了它的音频播放；最后，系统激活了你的audio session，然后你就可以开始播放了；</p>
+<h2 id="四-audio-session的激活和释放"><a class="markdownIt-Anchor" href="#四-audio-session的激活和释放"></a> 四、Audio Session的激活和释放</h2>
+<p>虽然AVFoundation的播放和录音会自动激活Audio Session，但是手动激活可以让你知道active audio session是否成功。<br />
+闹钟、来电或者日历提醒的时候，系统会将你的App deactive掉，当用户dismiss或者挂断电话后，系统允许app再次active audio session，这个时候你可以决定是否将自己的AudioSession进行激活。</p>
+<p>激活AudioSession的方法如下</p>
+<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line"><span class="comment">// Configure your audio session category, options, and mode</span></span><br><span class="line">[[<span class="built_in">AVAudioSession</span> sharedInstance] setCategory:<span class="built_in">AVAudioSessionCategoryPlayback</span> withOptions:<span class="number">0</span> error:<span class="literal">nil</span>];</span><br><span class="line"></span><br><span class="line"><span class="comment">// Activate your audio session to enable your custom configuration</span></span><br><span class="line"><span class="built_in">NSError</span> *outError = <span class="literal">nil</span>;</span><br><span class="line"><span class="type">BOOL</span> ret = [[<span class="built_in">AVAudioSession</span> sharedInstance] setActive:<span class="literal">YES</span> error:&amp;outError];</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>可以将<code>setActive</code> 的参数设置为NO来释放AudioSession。除了一些VoIP、录音这些App，大多数App并不需要对AudioSession进行显式的释放。</p>
+<blockquote>
+<p>对拥有VoIP功能的App，要确保在后台待机运行的情况下不激活AudioSession，确保只有收到呼叫的时候才激活AudioSession；</p>
+<p>对于使用recording category的App，要确保只有它在录音的时候才处于激活状态。在录音前和录音结束后，要将AudioSession设置为未激活态，这样其他功能的音频提示、消息才能被正确播放出来；</p>
+</blockquote>
+<h2 id="五-处理中断"><a class="markdownIt-Anchor" href="#五-处理中断"></a> 五、处理中断</h2>
+<p>为了让App的可以在AudioSesson被电话呼叫、闹钟和其他App的Active事件打断后正常工作，我们需要去监听AudioSession的打断事件。音频的打断来自于那些被激活且未配置mix with others的AudioSession，打断会使我们的AudioSession处于未激活状态，然后结束我们对Audio的使用。</p>
+ <img src="/images/audio/audio_session_interrupted.png" width="600"/>
+<p>以上图片演示了一个播放应用程序的AudioSessionz在中断之前、期间和之后的事件序列。</p>
+<p>可以使用<code>AVAudioSessionInterruptionNotification</code> 来监听AudioSession的变化：</p>
+<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line">[[<span class="built_in">NSNotificationCenter</span> defaultCenter] addObserver:<span class="keyword">self</span> selector:<span class="keyword">@selector</span>(handleInterruption:) name:<span class="built_in">AVAudioSessionInterruptionNotification</span> object:[<span class="built_in">AVAudioSession</span> sharedInstance]];</span><br></pre></td></tr></table></figure>
+<p>在interrupt begin和interrupt end的时候做对应处理，当interruptType为<code>AVAudioSessionInterruptionTypeEnded</code>时，可以从userInfo中通过<code>AVAudioSessionInterruptionOptionKey</code>拿到option，当option的值为<code>AVAudioSessionInterruptionOptionShouldResume</code>时，可以重新激活AudioSession并开始进行record或者play。</p>
+<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line">- (<span class="type">void</span>)handleInterruption:(<span class="built_in">NSNotification</span> *)notification &#123;</span><br><span class="line">    <span class="built_in">NSDictionary</span> *info = notification.userInfo;</span><br><span class="line">    <span class="built_in">AVAudioSessionInterruptionType</span> interruptType = [info[<span class="built_in">AVAudioSessionInterruptionTypeKey</span>] unsignedIntegerValue];</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (interruptType == <span class="built_in">AVAudioSessionInterruptionTypeBegan</span>) &#123;</span><br><span class="line">        <span class="comment">// Interruption began, take appropriate actions (save state, update user interface)</span></span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (interruptType == <span class="built_in">AVAudioSessionInterruptionTypeEnded</span>) &#123;</span><br><span class="line">        <span class="built_in">AVAudioSessionInterruptionOptions</span> option = [info[<span class="built_in">AVAudioSessionInterruptionOptionKey</span>] unsignedIntegerValue];</span><br><span class="line">        <span class="keyword">if</span> (option == <span class="built_in">AVAudioSessionInterruptionOptionShouldResume</span>) &#123;</span><br><span class="line">            <span class="comment">// reactive audio session &amp; play</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="六-响应媒体服务重置"><a class="markdownIt-Anchor" href="#六-响应媒体服务重置"></a> 六、响应媒体服务重置</h2>
+<p>媒体服务通过共享服务进程来提供音频和其他多媒体功能。虽然很罕见，但是在你的App处于active的时候，媒体服务重置的情况还是有可能发生的。可以通过注册 <code>AVAudioSessionMediaServicesWereResetNotification</code> 来监听媒体服务被重置的情况。当这种情况发生时，你需要做一些处理:</p>
+<ul>
+<li>清理之前的audio对象（例如players、recorders、converters和audio queue），重新创建一个新的；</li>
+<li>重置所有正在跟踪的内部音频状态，包括AVAudioSession的所有属性；</li>
+<li>适当时，使用setActive:error:方法重新激活AVAudioSession实例；</li>
+</ul>
+<blockquote>
+<p>Apps 无需重新注册AudioSession的notification，无需对AudioSession的属性进行 key-value 监控进行重置；</p>
+</blockquote>
+]]></content>
+      <tags>
+        <tag>音视频</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>ExtendedLayout</title>
     <url>/2017/06/15/ExtendedLayout/</url>
     <content><![CDATA[<p>UIViewController中的定义</p>
@@ -340,6 +340,34 @@ token用于标记语法解析中用到的基本语素，教程里称之为“记
 ]]></content>
       <tags>
         <tag>编译原理</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>MacOS 编译C++</title>
+    <url>/2016/10/31/MacOS-%E7%BC%96%E8%AF%91C/</url>
+    <content><![CDATA[<h2 id="编译"><a class="markdownIt-Anchor" href="#编译"></a> 编译</h2>
+<p>指用编译器(compiler)将源代码(source code)生成二进制目标文件(object file)，在Windows下也就是 .obj 文件，UNIX下是 .o 文件。编译时，编译器需要的是语法的正确，函数与变量的声明的正确，编译器只检测程序语法，和函数、变量是否被声明，函数并不需要被定义。<br />
+mac os 下编译C++的文件：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">g++ -c test.cpp    </span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>-c 是compile的意思<br />
+生成二进制文件 test.o。</p>
+<h2 id="链接"><a class="markdownIt-Anchor" href="#链接"></a> 链接</h2>
+<p>找到所要用到函数所在的目标文件，并把它们链接在一起合成为可执行文件(executable file)。链接时，要确保编译器能找到所有被用到了的函数所在的目标文件。<br />
+mac os 下编译C++的文件：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">g++ test.o -o output </span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>生成可执行文件output。这里可以将多个文件同时</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">g++ test.o test2.o -o output</span><br></pre></td></tr></table></figure>
+<h2 id="结合"><a class="markdownIt-Anchor" href="#结合"></a> 结合</h2>
+<p>编译和链接两个过程可以结合起来：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">g++ test.cpp test2.cpp -o output</span><br></pre></td></tr></table></figure>
+<p>一步生成可执行文件output。中间会先编译生成目标文件，然后链接生成可执行文件。</p>
+<p>另外如果只有一个C++文件，可以一步到位，生成执行文件a.out</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">g++ test.cpp</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>备忘</category>
+      </categories>
+      <tags>
+        <tag>C++</tag>
       </tags>
   </entry>
   <entry>
@@ -595,32 +623,90 @@ object_getClass(类对象) != [类对象 class]</p>
       </tags>
   </entry>
   <entry>
-    <title>MacOS 编译C++</title>
-    <url>/2016/10/31/MacOS-%E7%BC%96%E8%AF%91C/</url>
-    <content><![CDATA[<h2 id="编译"><a class="markdownIt-Anchor" href="#编译"></a> 编译</h2>
-<p>指用编译器(compiler)将源代码(source code)生成二进制目标文件(object file)，在Windows下也就是 .obj 文件，UNIX下是 .o 文件。编译时，编译器需要的是语法的正确，函数与变量的声明的正确，编译器只检测程序语法，和函数、变量是否被声明，函数并不需要被定义。<br />
-mac os 下编译C++的文件：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">g++ -c test.cpp    </span><br><span class="line"></span><br></pre></td></tr></table></figure>
-<p>-c 是compile的意思<br />
-生成二进制文件 test.o。</p>
-<h2 id="链接"><a class="markdownIt-Anchor" href="#链接"></a> 链接</h2>
-<p>找到所要用到函数所在的目标文件，并把它们链接在一起合成为可执行文件(executable file)。链接时，要确保编译器能找到所有被用到了的函数所在的目标文件。<br />
-mac os 下编译C++的文件：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">g++ test.o -o output </span><br><span class="line"></span><br></pre></td></tr></table></figure>
-<p>生成可执行文件output。这里可以将多个文件同时</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">g++ test.o test2.o -o output</span><br></pre></td></tr></table></figure>
-<h2 id="结合"><a class="markdownIt-Anchor" href="#结合"></a> 结合</h2>
-<p>编译和链接两个过程可以结合起来：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">g++ test.cpp test2.cpp -o output</span><br></pre></td></tr></table></figure>
-<p>一步生成可执行文件output。中间会先编译生成目标文件，然后链接生成可执行文件。</p>
-<p>另外如果只有一个C++文件，可以一步到位，生成执行文件a.out</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">g++ test.cpp</span><br></pre></td></tr></table></figure>]]></content>
-      <categories>
-        <category>备忘</category>
-      </categories>
+    <title>Socket Programming in C/C++</title>
+    <url>/2022/06/04/Socket-Programming-in-C-C/</url>
+    <content><![CDATA[<p><img src="/images/network/socket.jpeg" alt="" /></p>
+<h3 id="what-is-socket-programming"><a class="markdownIt-Anchor" href="#what-is-socket-programming"></a> What is socket programming?</h3>
+<p>Socket programming is a way of connecting two nodes on a network to communicate with each other. One socket(node) listens on a particular port at an IP, while the other socket reaches out to the other to form a connection. The server forms the listener socket while the client reaches out to the server.</p>
+<h3 id="state-diagram-for-server-and-client-model"><a class="markdownIt-Anchor" href="#state-diagram-for-server-and-client-model"></a> State diagram for server and client model</h3>
+<img src="/images/network/serverandclientmodel.png" width="400">
+<h3 id="stages-for-server"><a class="markdownIt-Anchor" href="#stages-for-server"></a> Stages for server</h3>
+<p><strong>1、socket creation:</strong></p>
+<pre><code>int sockfd = socket(domain, type, protocol)]
+</code></pre>
+<blockquote>
+<p><strong>sockfd:</strong> socket descriptor, an integer (like a file-handle)<br />
+<strong>1. domain:</strong> integer, specifies communication domain. We use AF_LOCAL as defined in the POSIX standard for communication between processes on the same host(most infomation see <a href="https://blog.csdn.net/frank_jb/article/details/77199834">https://blog.csdn.net/frank_jb/article/details/77199834</a>). For communicating between processes on different hosts connected by IPV4, we use AF_INET and AF_I NET 6 for processes connected by IPV6.<br />
+<strong>2. type:</strong> communication type<br />
+SOCK_STREAM: TCP(reliable, connection oriented)<br />
+SOCK_DGRAM: UDP(unreliable, connectionless)<br />
+<strong>3. protocol:</strong> Protocol value for Internet Protocol(IP), which is 0. This is the same number which appears on protocol field in the IP header of a packet.(man protocols for more details)</p>
+</blockquote>
+<p><strong>2、setsockopt:</strong> This helps in manipulating options for the socket referred by the file descriptor sockfd. This is completely optional, but it helps in reuse of address and port. Prevents error such as: “address already in use”.</p>
+<pre><code>int setsockopt(int sockfd, int level, int optname,  const void *optval, socklen_t optlen);
+</code></pre>
+<p><strong>3、Bind:</strong></p>
+<pre><code>int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+</code></pre>
+<p>After creation of the socket, bind function binds the socket to the address and port number specified in addr(custom data structure). In the example code, we bind the server to the localhost, hence we use INADDR_ANY to specify the IP address.</p>
+<p><strong>4、Listen:</strong></p>
+<pre><code>int listen(int sockfd, int backlog);
+</code></pre>
+<p>It puts the server socket in a passive mode, where it waits for the client to approach the server to make a connection. The backlog, defines the maximum length to which the queue of pending connections for sockfd may grow. If a connection request arrives when the queue is full, the client may receive an error with an indication of ECONNREFUSED.</p>
+<p><strong>5、Accept:</strong></p>
+<pre><code>int new_socket= accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+</code></pre>
+<p>It extracts the first connection request on the queue of pending connections for the listening socket, sockfd, creates a new connected socket, and returns a new file descriptor referring to that socket. At this point, connection is established between client and server, and they are ready to transfer data.</p>
+<h2 id="stages-for-client"><a class="markdownIt-Anchor" href="#stages-for-client"></a> Stages for Client</h2>
+<p><strong>1、Socket connection:</strong> Exactly same as that of server’s socket creation<br />
+Connect:</p>
+<p><strong>2、The connect()</strong> system call connects the socket referred to by the file descriptor sockfd to the address specified by addr. Server’s address<br />
+and port is specified in addr.</p>
+<pre><code>int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+</code></pre>
+<h2 id="implementation"><a class="markdownIt-Anchor" href="#implementation"></a> Implementation</h2>
+<p>Here we are exchanging one hello message between server and client to demonstrate the client/server model.</p>
+<p>Server.c</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">//  Client.c</span></span><br><span class="line"><span class="comment">//  ServerTest</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">//  Created by disen zhang on 2022/6/8.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/socket.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;netinet/in.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> g_svfd;</span><br><span class="line"></span><br><span class="line"><span class="type">long</span> <span class="title function_">send_data_to_socket</span><span class="params">(<span class="type">int</span> socket)</span> &#123;</span><br><span class="line">    <span class="type">char</span> buf[<span class="number">1024</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    <span class="type">const</span> <span class="type">size_t</span> buf_size = <span class="keyword">sizeof</span>(buf) - <span class="number">1</span>;</span><br><span class="line">    <span class="built_in">snprintf</span>(buf, buf_size, <span class="string">&quot;Server Have Revc Your Connect, Bye.&quot;</span>);</span><br><span class="line">    <span class="type">long</span> sendLen = send(socket, buf, <span class="built_in">strlen</span>(buf), <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (sendLen == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Send Failed\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> sendLen;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">read_data_from_socket</span><span class="params">(<span class="type">int</span> sockfd)</span> &#123;</span><br><span class="line">    <span class="type">char</span> recv_data[<span class="number">1024</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    <span class="type">long</span> rc = recv(sockfd, recv_data, <span class="keyword">sizeof</span>(recv_data), <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (rc &lt;= <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Server Read Failed cs:%ld\n&quot;</span>, rc);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Server Revc:%s from sockfds:%d\n&quot;</span>, recv_data, sockfd);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">exit_server</span><span class="params">(<span class="type">void</span>)</span> &#123;</span><br><span class="line">    shutdown(g_svfd, SHUT_RDWR);</span><br><span class="line">    close(g_svfd);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;close server socket:%d\n&quot;</span>, g_svfd);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">start_server</span><span class="params">(<span class="type">int</span> port)</span> &#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_in</span> <span class="title">address</span>;</span></span><br><span class="line">    address.sin_family = AF_INET;</span><br><span class="line">    address.sin_addr.s_addr = INADDR_ANY;</span><br><span class="line">    address.sin_port = htons(port);</span><br><span class="line">    </span><br><span class="line">    </span><br><span class="line">    <span class="comment">// Creating socket file descriptor</span></span><br><span class="line">    <span class="keyword">if</span> ((g_svfd = socket(AF_INET, SOCK_STREAM, <span class="number">0</span>)) == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;socket failed\n&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Forcefully attaching socket to the port 8080</span></span><br><span class="line">    <span class="type">int</span> opt = <span class="number">1</span>;</span><br><span class="line">    <span class="type">int</span> ret = setsockopt(g_svfd, SOL_SOCKET, SO_KEEPALIVE, &amp;opt, <span class="keyword">sizeof</span>(opt));</span><br><span class="line">    <span class="keyword">if</span> (ret != <span class="number">0</span>) &#123;</span><br><span class="line">        perror(<span class="string">&quot;setsockopt&quot;</span>);</span><br><span class="line">        close(g_svfd);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-2</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// Forcefully attaching socket to the port 8080</span></span><br><span class="line">    <span class="keyword">if</span> (bind(g_svfd, (<span class="keyword">struct</span> sockaddr*)&amp;address, <span class="keyword">sizeof</span>(address)) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        perror(<span class="string">&quot;bind&quot;</span>);</span><br><span class="line">        close(g_svfd);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-3</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (listen(g_svfd, SOMAXCONN) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        perror(<span class="string">&quot;listen&quot;</span>);</span><br><span class="line">        close(g_svfd);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-4</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;server start with port:%d fd:%d\n&quot;</span>, port, g_svfd);</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> g_svfd;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">accept_client_conn</span><span class="params">(<span class="type">void</span>)</span> &#123;</span><br><span class="line">    <span class="type">int</span> sockfd = accept(g_svfd, <span class="literal">NULL</span>, <span class="literal">NULL</span>);</span><br><span class="line">    <span class="keyword">if</span> (sockfd &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        perror(<span class="string">&quot;accept&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    read_data_from_socket(sockfd);</span><br><span class="line">    send_data_to_socket(sockfd);</span><br><span class="line"></span><br><span class="line">    shutdown(sockfd, SHUT_RDWR);</span><br><span class="line">    close(sockfd);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> sockfd;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>main.c for Server</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;Server.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">on_exit</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">//do something when process exits</span></span><br><span class="line">    exit_server();</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;on_exit\n&quot;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> * argv[])</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (argc != <span class="number">2</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;please add port\n&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    atexit(on_exit);</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> port = atoi(argv[<span class="number">1</span>]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;port:%d\n&quot;</span>, port);</span><br><span class="line">    <span class="type">int</span> ret = start_server(port);</span><br><span class="line">    <span class="keyword">if</span> (ret &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;server start fail\n&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    accept_client_conn();</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>client.c</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">//  Client.c</span></span><br><span class="line"><span class="comment">//  ServerTest</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">//  Created by disen zhang on 2022/6/8.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;Client.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/socket.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;netinet/in.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;arpa/inet.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> g_socket;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">client_read_data_from_socket</span><span class="params">(<span class="type">int</span> sockfd)</span> &#123;</span><br><span class="line">    <span class="type">char</span> recv_data[<span class="number">1024</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    <span class="type">long</span> rc = recv(sockfd, recv_data, <span class="keyword">sizeof</span>(recv_data), <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (rc &lt;= <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Client Read Failed cs:%ld\n&quot;</span>, rc);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Client Socket acc:%d revc:%s\n&quot;</span>, sockfd, recv_data);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">long</span> <span class="title function_">send_data_from_socket</span><span class="params">(<span class="type">int</span> socket)</span> &#123;</span><br><span class="line">    <span class="type">char</span> buf[<span class="number">1024</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    <span class="type">const</span> <span class="type">size_t</span> buf_size = <span class="keyword">sizeof</span>(buf) - <span class="number">1</span>;</span><br><span class="line">    <span class="built_in">snprintf</span>(buf, buf_size, <span class="string">&quot;Client Send Data From Socket:%d&quot;</span>, socket);</span><br><span class="line">    <span class="type">long</span> sendLen = send(socket, buf, <span class="built_in">strlen</span>(buf), <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (sendLen == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Send Failed\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> sendLen;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">close_connect</span><span class="params">()</span> &#123;</span><br><span class="line">    shutdown(g_socket, SHUT_RDWR);</span><br><span class="line">    close(g_socket);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;close server socket:%d\n&quot;</span>, g_socket);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">start_connect</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *ip, <span class="type">int</span> port)</span> &#123;</span><br><span class="line">    g_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);</span><br><span class="line">    <span class="keyword">if</span> (g_socket &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Socket:%d Create Error\n&quot;</span>, g_socket);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="type">int</span> r = <span class="number">1</span>;</span><br><span class="line">    setsockopt(g_socket, SOL_SOCKET, SO_NOSIGPIPE, &amp;r, <span class="keyword">sizeof</span>(<span class="type">int</span>));</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// int timeoutMs = 100000;</span></span><br><span class="line">    <span class="comment">// __darwin_time_t tv_sec = timeoutMs / 1000;</span></span><br><span class="line">    <span class="comment">// __darwin_suseconds_t tv_usec = (timeoutMs % 1000) * 1000;</span></span><br><span class="line">    <span class="comment">// struct timeval tv = &#123;tv_sec, tv_usec&#125;;</span></span><br><span class="line">    <span class="comment">// setsockopt(g_socket, SOL_SOCKET, SO_SNDTIMEO, &amp;tv, sizeof(tv));</span></span><br><span class="line">    <span class="comment">// setsockopt(g_socket, SOL_SOCKET, SO_RCVTIMEO, &amp;tv, sizeof tv);</span></span><br><span class="line">    </span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">in_addr</span> <span class="title">addr</span>;</span></span><br><span class="line">    addr.s_addr = <span class="number">0</span>;</span><br><span class="line">    inet_pton(AF_INET, ip, &amp;addr);</span><br><span class="line"></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_in</span> <span class="title">to</span> =</span> &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    to.sin_addr.s_addr = addr.s_addr;</span><br><span class="line">    to.sin_port = htons(port);</span><br><span class="line">    to.sin_family = AF_INET;</span><br><span class="line">    </span><br><span class="line">    <span class="type">long</span> rc = connect(g_socket, (<span class="keyword">struct</span> sockaddr*)&amp;to,<span class="keyword">sizeof</span>(to));</span><br><span class="line">    <span class="keyword">if</span> (rc &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Socket:%d Connect Failed\n&quot;</span>, g_socket);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    send_data_from_socket(g_socket);</span><br><span class="line">    client_read_data_from_socket(g_socket);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> g_socket;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>the main.c for Client</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;Client.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">on_exit</span><span class="params">(<span class="type">void</span>)</span> &#123;</span><br><span class="line">    <span class="comment">//do something when process exits</span></span><br><span class="line">    close_connect();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> * argv[])</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (argc != <span class="number">2</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;please add port\n&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    atexit(on_exit);</span><br><span class="line">    <span class="type">int</span> port = atoi(argv[<span class="number">1</span>]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;port:%d\n&quot;</span>, port);</span><br><span class="line"></span><br><span class="line">    start_connect(<span class="string">&quot;127.0.0.1&quot;</span>, port);</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Source Code : <a href="https://github.com/zhangdongxuan/CodeSlice/tree/master/network/SampleSocket">https://github.com/zhangdongxuan/CodeSlice/tree/master/network/SampleSocket</a></p>
+<p><strong>Server:</strong></p>
+<pre><code>cmake CMakeLists.txt 
+make 
+./SocketServer 8080
+</code></pre>
+<p><strong>Client:</strong></p>
+<pre><code>cmake CMakeLists.txt 
+make 
+./SocketClient 8080
+</code></pre>
+<p><strong>Server Output:</strong></p>
+<pre><code>port:8080
+server start with port:8080 fd:3
+Server Revc:Client Send Data From Socket:3 from sockfds:4
+close server socket:3
+on_exit
+</code></pre>
+<p><strong>Client Output:</strong></p>
+<pre><code>port:8080
+Client Socket acc:3 revc:Server Have Revc Your Connect, Bye.
+close server socket:3
+</code></pre>
+<p><a href="https://www.ibm.com/docs/en/i/7.4?topic=designs-using-poll-instead-select">https://www.ibm.com/docs/en/i/7.4?topic=designs-using-poll-instead-select</a></p>
+]]></content>
       <tags>
-        <tag>C++</tag>
+        <tag>网络编程</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>SpringBoot</title>
+    <url>/2025/08/12/SpringBoot/</url>
+    <content><![CDATA[]]></content>
   </entry>
   <entry>
     <title>基于Double Array Tire的AC自动机</title>
@@ -1097,6 +1183,88 @@ AVAsset是一个抽象类，我们一般使用其子类AVURLAsset和AVCompositio
       </tags>
   </entry>
   <entry>
+    <title>模式匹配之KMP算法详解</title>
+    <url>/2021/04/17/kmp/</url>
+    <content><![CDATA[<img src="/images/algorithm/1.png" width="700"/>
+<p>模式匹配分为单模式匹配和多模式匹配两种类型。</p>
+<p>单模式匹配就是给定一串文本，查找单个子串是否在文本中；<br />
+多模式匹配就是给定一串文本，查找多个子串是否在文本中；</p>
+<p>本文只介绍单模式匹配。</p>
+<h2 id="算法复杂度"><a class="markdownIt-Anchor" href="#算法复杂度"></a> 算法复杂度</h2>
+<p>假设给定的文本的长度为n，给定的子串的长度为m，判断子串是否在文本中。</p>
+<p>暴力算法</p>
+<blockquote>
+<p>算法复杂度为 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><mi>n</mi><mo>−</mo><mi>m</mi><mo>+</mo><mn>1</mn><mo stretchy="false">)</mo><mo>∗</mo><mi>m</mi></mrow><annotation encoding="application/x-tex">O(n - m + 1) * m</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="mopen">(</span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:0.66666em;vertical-align:-0.08333em;"></span><span class="mord mathnormal">m</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">1</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">∗</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:0.43056em;vertical-align:0em;"></span><span class="mord mathnormal">m</span></span></span></span></p>
+</blockquote>
+<p>KMP</p>
+<blockquote>
+<p>算法复杂度为 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><mi>n</mi><mo>+</mo><mi>m</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(n + m)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="mopen">(</span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">m</span><span class="mclose">)</span></span></span></span></p>
+</blockquote>
+<h2 id="kmp算法"><a class="markdownIt-Anchor" href="#kmp算法"></a> KMP算法</h2>
+<p>Knuth-Morris-Pratt算法（简称KMP）是最常用字符串匹配算法之一。<br />
+它以三个发明者命名，起头的那个K就是著名科学家Donald Knuth。</p>
+<p>KMP的核心就是构建失配信息，构建失配信息的核心就是查找 <strong>前缀和后缀最长共有元素</strong>这里后面会进行介绍。</p>
+<p>这里以文本“BBC ABCDAB ABCDABCDABDE”，子串“ABCDABD”的匹配过程为例来进行说明，<br />
+<img src="/images/algorithm/kmp1.png" width="400"/>首先第一步B和A不匹配，直接后移一位；</p>
+<p><img src="/images/algorithm/kmp2.png" width="400"/>第二步发现B和A也不匹配，再后移，直到匹配到第4位的A；</p>
+<p><img src="/images/algorithm/kmp3.png" width="400"/>从第4位开始，ABCDAB都是和子串部分相匹配。</p>
+<p><img src="/images/algorithm/kmp4.png" width="400"/>这个时候“D”字符无法继续匹配，按照一般的做法，我们会将子串后移一位，从下图的位置继续匹配。</p>
+<p><img src="/images/algorithm/kmp5.png" width="400"/>但是KMP并不是这么做的，KMP会直接向后移动4位,然后将文本的“ ”和子串的“C”进行匹配，这样直接减少了很多不必要的匹配操作；<br />
+<img src="/images/algorithm/kmp6.png" width="400"/></p>
+<h2 id="失配信息表"><a class="markdownIt-Anchor" href="#失配信息表"></a> 失配信息表</h2>
+<p>失配信息表是在匹配过程中出现失配情况的跳转依据，其核心思想就是<br />
+<strong>查找当前模式子串的前缀和后缀最长共有元素</strong></p>
+<p>首先，要了解两个概念：“前缀”和“后缀”。<br />
+“前缀”指除了最后一个字符以外，一个字符串的全部头部组合；<br />
+“后缀”指除了第一个字符以外，一个字符串的全部尾部组合。</p>
+<p>ABCDABD 的失配信息表如下</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">失配字符</th>
+<th style="text-align:center">A</th>
+<th style="text-align:center">B</th>
+<th style="text-align:center">C</th>
+<th style="text-align:center">D</th>
+<th style="text-align:center">A</th>
+<th style="text-align:center">B</th>
+<th style="text-align:center">D</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">部分匹配值</td>
+<td style="text-align:center">0</td>
+<td style="text-align:center">0</td>
+<td style="text-align:center">0</td>
+<td style="text-align:center">0</td>
+<td style="text-align:center">1</td>
+<td style="text-align:center">2</td>
+<td style="text-align:center">0</td>
+</tr>
+</tbody>
+</table>
+<p>其构造的方式就是<code>按照查找当前已经匹配部分的前缀和后缀最长共有元素</code>,</p>
+<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line">- <span class="string">&quot;A&quot;</span>的前缀和后缀都为空集，共有元素的长度为<span class="number">0</span>；</span><br><span class="line">- <span class="string">&quot;AB&quot;</span>的前缀为[A]，后缀为[B]，共有元素的长度为<span class="number">0</span>；</span><br><span class="line">- <span class="string">&quot;ABC&quot;</span>的前缀为[A, AB]，后缀为[BC, C]，共有元素的长度<span class="number">0</span>；</span><br><span class="line">- <span class="string">&quot;ABCD&quot;</span>的前缀为[A, AB, ABC]，后缀为[BCD, CD, D]，共有元素的长度为<span class="number">0</span>；</span><br><span class="line">- <span class="string">&quot;ABCDA&quot;</span>的前缀为[A, AB, ABC, ABCD]，后缀为[BCDA, CDA, DA, A]，共有元素为<span class="string">&quot;A&quot;</span>，长度为<span class="number">1</span>；</span><br><span class="line">- <span class="string">&quot;ABCDAB&quot;</span>的前缀为[A, AB, ABC, ABCD, ABCDA]，后缀为[BCDAB, CDAB, DAB, AB, B]，共有元素为<span class="string">&quot;AB&quot;</span>，长度为<span class="number">2</span>；</span><br><span class="line">- <span class="string">&quot;ABCDABD&quot;</span>的前缀为[A, AB, ABC, ABCD, ABCDA, ABCDAB]，后缀为[BCDABD, CDABD, DABD, ABD, BD, D]，共有元素的长度为<span class="number">0</span>。</span><br></pre></td></tr></table></figure>
+<h2 id="失配跳转"><a class="markdownIt-Anchor" href="#失配跳转"></a> 失配跳转</h2>
+<img src="/images/algorithm/kmp4.png" width="400"/>
+在上面匹配过程中，在出现“D”字符失配的时候，直接往后移动了4位，移动规则如下
+<blockquote>
+<p>后移位数 = 已匹配的字符数 - 对应的部分匹配值</p>
+</blockquote>
+<p>即 后移位数 = 6(ABCDAB) - 2 = 4，进行跳转以后，使用&quot;C&quot;和当前文本位置的“ ”继续进行比较，这就是KMP算法匹配的跳转过程。<br />
+<img src="/images/algorithm/kmp6.png" width="400"/></p>
+<h2 id="代码实现"><a class="markdownIt-Anchor" href="#代码实现"></a> 代码实现</h2>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">init_next</span><span class="params">(string pattern, <span class="type">int</span> next[])</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="type">unsigned</span> <span class="type">long</span> len = pattern.<span class="built_in">length</span>();</span><br><span class="line">    next[<span class="number">0</span>] = <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i = <span class="number">1</span>,k = <span class="number">0</span>; i &lt; len; i++) &#123;</span><br><span class="line">        <span class="keyword">while</span>(k &gt; <span class="number">0</span> &amp;&amp; pattern[k] != pattern[i]) &#123;</span><br><span class="line">            k = next[k - <span class="number">1</span>];</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span>(pattern[k] == pattern[i]) &#123;</span><br><span class="line">            k ++;</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        next[i] = k;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">search</span><span class="params">(string content, string pattern)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="type">int</span> next[pattern.<span class="built_in">length</span>()];</span><br><span class="line">    <span class="built_in">init_next</span>(pattern, next);</span><br><span class="line">    </span><br><span class="line">    <span class="type">int</span> i = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span> (i &lt;= content.<span class="built_in">length</span>() - pattern.<span class="built_in">length</span>()) &#123;</span><br><span class="line">        </span><br><span class="line">        <span class="type">int</span> j = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">for</span> (; j &lt; pattern.<span class="built_in">length</span>(); j ++) &#123;</span><br><span class="line">            <span class="keyword">if</span> (pattern[j] == content[i + j]) &#123;</span><br><span class="line">                <span class="keyword">continue</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            <span class="type">int</span> jump = j - next[j - <span class="number">1</span>];</span><br><span class="line">            i += <span class="built_in">MAX</span>(jump, <span class="number">1</span>);;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span> (j == pattern.<span class="built_in">length</span>()) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">const</span> <span class="type">char</span> * argv[])</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="type">bool</span> exist = <span class="built_in">search</span>(<span class="string">&quot;ABCDABCDABDE&quot;</span>, <span class="string">&quot;ABCDABD&quot;</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;kmp search exist:%u\n&quot;</span>, exist);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><a href="https://github.com/zhangdongxuan/CodeSlice/tree/master/algorithm/KMP/KMP">点击查看源码</a></p>
+<p>参考<br />
+<a href="http://www.ruanyifeng.com/blog/2013/05/Knuth%E2%80%93Morris%E2%80%93Pratt_algorithm.html">http://www.ruanyifeng.com/blog/2013/05/Knuth–Morris–Pratt_algorithm.html</a></p>
+]]></content>
+      <tags>
+        <tag>算法</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>mmap的原理与使用</title>
     <url>/2023/09/02/mmap%E7%9A%84%E5%8E%9F%E7%90%86%E4%B8%8E%E4%BD%BF%E7%94%A8/</url>
     <content><![CDATA[<p>在很以高性能著称的技术组件中我们经常会看到<code>mmap</code>的影子，最近我做的一个小需求就使用到了<code>mmap</code>来避免读取大文件<code>OOM</code>的问题，另外我发明的一款高性能多模匹配组件也将要使用<code>mmap</code>来进一步提升性能。</p>
@@ -1245,6 +1413,63 @@ AVAsset是一个抽象类，我们一般使用其子类AVURLAsset和AVCompositio
       <tags>
         <tag>iOS基础</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>轻弹幕隐私协议</title>
+    <url>/2015/10/14/qingdanmu-private/</url>
+    <content><![CDATA[<p>「轻弹幕」网（以下简称「轻弹幕」）非常重视对您的个人隐私保护，有时候我们需要某些信息才能为您提供您请求的服务，本隐私声明解释了这些情况下的数据收集和使用情况。</p>
+<p>本隐私声明适用于「轻弹幕」的所有相关服务，随着「轻弹幕」服务范围的扩大，隐私声明的内容可由「轻弹幕」随时更新，且毋须另行通知。更新后的隐私声明一旦在网页上公布即有效代替原来的隐私声明。我们收集哪些信息</p>
+<p>通常，您能在匿名的状态下访问「轻弹幕」并获取信息。当我们需要能识别您的个人信息或者可以与您联系的信息时，我们会征求您的同意。通常，在您注册「轻弹幕」或申请开通新的功能时，我们可能收集这些信息：姓名，Email地址，住址和电话号码，并征求您的确认。</p>
+<p>关于您的个人信息</p>
+<p>「轻弹幕」严格保护您个人信息的安全。我们使用各种安全技术和程序来保护您的个人信息不被未经授权的访问、使用或泄漏。</p>
+<p>「轻弹幕」会在法律要求或符合「轻弹幕」的相关服务条款、软件许可使用协议约定的情况下透露您的个人信息，或者有充分理由相信必须这样做才能：</p>
+<p>满足法律或行政法规的明文规定，或者符合「轻弹幕」网站适用的法律程序；</p>
+<p>符合「轻弹幕」相关服务条款、软件许可使用协议的约定；</p>
+<p>保护「轻弹幕」的权利或财产，以及在紧急情况下保护「轻弹幕」员工、「轻弹幕」产品或服务的用户或大众的个人安全。</p>
+<p>「轻弹幕」不会未经您的允许将这些信息与第三方共享，本声明已经列出的上述情况除外。</p>
+<p>Cookie的使用</p>
+<p>使用 Cookie 能帮助您实现您的联机体验的个性化，您可以接受或拒绝 Cookie ，大多数 Web 浏览器会自动接受 Cookie，但您通常可根据自己的需要来修改浏览器的设置以拒绝 Cookie。</p>
+<p>「轻弹幕」有时会使用 Cookie 以便知道哪些网站受欢迎，使您在访问「轻弹幕」时能得到更好的服务。Cookie不会跟踪个人信息。</p>
+<p>当您注册「轻弹幕」时，「轻弹幕」亦会使用 Cookie。在这种情况下，「轻弹幕」会收集并存储有用信息，当您再次访问「轻弹幕」时，我们可辨认您的身份。来自「轻弹幕」的 Cookie 只能被「轻弹幕」读取。</p>
+<p>如果您的浏览器被设置为拒绝 Cookie，您仍然能够访问「轻弹幕」的大多数网页。</p>
+<p>关于免责说明</p>
+<p>就下列相关事宜的发生，「轻弹幕」不承担任何法律责任：</p>
+<p>由于您将用户密码告知他人或与他人共享注册帐户，由此导致的任何个人信息的泄漏，或其他非因「轻弹幕」原因导致的个人信息的泄漏；</p>
+<p>「轻弹幕」根据法律规定或政府相关政策要求提供您的个人信息；</p>
+<p>任何第三方根据「轻弹幕」各服务条款及声明中所列明的情况使用您的个人信息，由此所产生的纠纷；</p>
+<p>任何由于黑客攻击、电脑病毒侵入或政府管制而造成的暂时性网站关闭；</p>
+<p>因不可抗力导致的任何后果；</p>
+<p>「轻弹幕」在各服务条款及声明中列明的使用方式或免责情形。</p>
+<p>您的鼓励是我们前进的动力！</p>
+]]></content>
+      <tags>
+        <tag>隐私协议</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>大屏 iPhone 的适配[转]</title>
+    <url>/2017/09/10/%E5%A4%A7%E5%B1%8F-iPhone-%E7%9A%84%E9%80%82%E9%85%8D-%E8%BD%AC/</url>
+    <content><![CDATA[<p>自从苹果出了大屏 iPhone 后，iOS 开发也要做适配了，想必 Android 程序员正在偷着乐呢 , 这里大概总结下这几天了解到的大屏适配的注意事项。</p>
+<h3 id="启用高分辨率模式"><a class="markdownIt-Anchor" href="#启用高分辨率模式"></a> 启用高分辨率模式</h3>
+<p>从 Xcode6 GM 版本开始，模拟器新增了 iPhone6 和 iPhone6 Plus 两种，如果旧的工程直接跑到这两个模拟器中时，默认是”兼容模式”，即系统会简单的把内容等比例放大，显示效果有些模糊但尚可接受。此时 App 内部获取到的设备分辨率和 iPhone5 是一样的：320*568 point。</p>
+<p>启用高分辨率模式有2个方法(目前我能找到的)：</p>
+<p>1.添加大屏的 LaunchImage:<br />
+在 Images.xcassets 里，新建或更改 LaunchImage 组，添加对应高分辨率的图片。对此，这里有一篇更详细的图文介绍：<a href="http://matthewpalmer.net/blog/2014/09/10/iphone-6-plus-launch-image-adaptive-mode/">How to Add a Launch Image for the iPhone 6</a>。如果想要快速测试一下新的效果，<a href="https://blog.ibireme.com/wp-content/uploads/2014/09/iPhone6LaunchBlanks.zip">这里</a>有3张示例图片下载。</p>
+<p>2.添加 Launch Screen File<br />
+Launch Screen 是 Xcode6 和 iOS8 新加的功能，它用一个 xib 文件来作为启动画面。App 在旧版 iOS 启动时，该属性会被自动忽略，不会造成异常。<br />
+首先，点击 New File -&gt;iOS User Interface -&gt;Launch Screen，然后在工程设置项里启用它：<br />
+<img src="https://blog.ibireme.com/wp-content/uploads/2014/09/LaunchFile.png" alt="" /><br />
+上面两处设置，只要启用任意一个即可让 App 进入高分辨率模式；但如果两处都没有设置，则 App 会回退到兼容模式。鉴于现在不少 App 还需要兼容 iOS5，而第一种方法在 iOS5 上据说可能有<a href="http://stackoverflow.com/questions/19220082/support-of-ios-5-0-icons-with-xcode-5">bug</a>，所以这里推荐用第二种方法。</p>
+<p>资源的显示<br />
+一图胜千言，首先这里是一个完整的图表：  <a href="http://www.paintcodeapp.com/news/ultimate-guide-to-iphone-resolutions">http://www.paintcodeapp.com/news/ultimate-guide-to-iphone-resolutions</a>。</p>
+<p>简单的说：iPhone4、iPhone5、iPhone6 这几个设备的 ppi 都是相同的，默认图片优先是 @2x。iPhone6 Plus 的像素密度更高，默认图片优先是 @3x。</p>
+<p>另外，iPhone6 Plus 有一点和其他设备不同：在 App 内部获得的屏幕分辨率是 1242<em>2208，但设备实际分辨率是 1920</em>1080，这时系统会把整体的显示内容做一个缩放，downscale 到1/1.15。这个特性在 OSX 上也有出现过：<br />
+<img src="https://blog.ibireme.com/wp-content/uploads/2014/09/DownScale.png" alt="" /></p>
+<BR>
+<p>下面列举一些可能有用的数据：<br />
+<img src="/images/SIZE.jpg" alt="" /></p>
+<p>note:转自:<a href="https://blog.ibireme.com/2014/09/16/adapted_to_iphone6/#more-41560">大屏 iPhone 的适配</a> From ibireme</p>
+]]></content>
   </entry>
   <entry>
     <title>浅谈Trie树</title>
@@ -1406,63 +1631,6 @@ POSIX defines these two terms as follows:
 ]]></content>
       <tags>
         <tag>网络编程</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>大屏 iPhone 的适配[转]</title>
-    <url>/2017/09/10/%E5%A4%A7%E5%B1%8F-iPhone-%E7%9A%84%E9%80%82%E9%85%8D-%E8%BD%AC/</url>
-    <content><![CDATA[<p>自从苹果出了大屏 iPhone 后，iOS 开发也要做适配了，想必 Android 程序员正在偷着乐呢 , 这里大概总结下这几天了解到的大屏适配的注意事项。</p>
-<h3 id="启用高分辨率模式"><a class="markdownIt-Anchor" href="#启用高分辨率模式"></a> 启用高分辨率模式</h3>
-<p>从 Xcode6 GM 版本开始，模拟器新增了 iPhone6 和 iPhone6 Plus 两种，如果旧的工程直接跑到这两个模拟器中时，默认是”兼容模式”，即系统会简单的把内容等比例放大，显示效果有些模糊但尚可接受。此时 App 内部获取到的设备分辨率和 iPhone5 是一样的：320*568 point。</p>
-<p>启用高分辨率模式有2个方法(目前我能找到的)：</p>
-<p>1.添加大屏的 LaunchImage:<br />
-在 Images.xcassets 里，新建或更改 LaunchImage 组，添加对应高分辨率的图片。对此，这里有一篇更详细的图文介绍：<a href="http://matthewpalmer.net/blog/2014/09/10/iphone-6-plus-launch-image-adaptive-mode/">How to Add a Launch Image for the iPhone 6</a>。如果想要快速测试一下新的效果，<a href="https://blog.ibireme.com/wp-content/uploads/2014/09/iPhone6LaunchBlanks.zip">这里</a>有3张示例图片下载。</p>
-<p>2.添加 Launch Screen File<br />
-Launch Screen 是 Xcode6 和 iOS8 新加的功能，它用一个 xib 文件来作为启动画面。App 在旧版 iOS 启动时，该属性会被自动忽略，不会造成异常。<br />
-首先，点击 New File -&gt;iOS User Interface -&gt;Launch Screen，然后在工程设置项里启用它：<br />
-<img src="https://blog.ibireme.com/wp-content/uploads/2014/09/LaunchFile.png" alt="" /><br />
-上面两处设置，只要启用任意一个即可让 App 进入高分辨率模式；但如果两处都没有设置，则 App 会回退到兼容模式。鉴于现在不少 App 还需要兼容 iOS5，而第一种方法在 iOS5 上据说可能有<a href="http://stackoverflow.com/questions/19220082/support-of-ios-5-0-icons-with-xcode-5">bug</a>，所以这里推荐用第二种方法。</p>
-<p>资源的显示<br />
-一图胜千言，首先这里是一个完整的图表：  <a href="http://www.paintcodeapp.com/news/ultimate-guide-to-iphone-resolutions">http://www.paintcodeapp.com/news/ultimate-guide-to-iphone-resolutions</a>。</p>
-<p>简单的说：iPhone4、iPhone5、iPhone6 这几个设备的 ppi 都是相同的，默认图片优先是 @2x。iPhone6 Plus 的像素密度更高，默认图片优先是 @3x。</p>
-<p>另外，iPhone6 Plus 有一点和其他设备不同：在 App 内部获得的屏幕分辨率是 1242<em>2208，但设备实际分辨率是 1920</em>1080，这时系统会把整体的显示内容做一个缩放，downscale 到1/1.15。这个特性在 OSX 上也有出现过：<br />
-<img src="https://blog.ibireme.com/wp-content/uploads/2014/09/DownScale.png" alt="" /></p>
-<BR>
-<p>下面列举一些可能有用的数据：<br />
-<img src="/images/SIZE.jpg" alt="" /></p>
-<p>note:转自:<a href="https://blog.ibireme.com/2014/09/16/adapted_to_iphone6/#more-41560">大屏 iPhone 的适配</a> From ibireme</p>
-]]></content>
-  </entry>
-  <entry>
-    <title>轻弹幕隐私协议</title>
-    <url>/2015/10/14/qingdanmu-private/</url>
-    <content><![CDATA[<p>「轻弹幕」网（以下简称「轻弹幕」）非常重视对您的个人隐私保护，有时候我们需要某些信息才能为您提供您请求的服务，本隐私声明解释了这些情况下的数据收集和使用情况。</p>
-<p>本隐私声明适用于「轻弹幕」的所有相关服务，随着「轻弹幕」服务范围的扩大，隐私声明的内容可由「轻弹幕」随时更新，且毋须另行通知。更新后的隐私声明一旦在网页上公布即有效代替原来的隐私声明。我们收集哪些信息</p>
-<p>通常，您能在匿名的状态下访问「轻弹幕」并获取信息。当我们需要能识别您的个人信息或者可以与您联系的信息时，我们会征求您的同意。通常，在您注册「轻弹幕」或申请开通新的功能时，我们可能收集这些信息：姓名，Email地址，住址和电话号码，并征求您的确认。</p>
-<p>关于您的个人信息</p>
-<p>「轻弹幕」严格保护您个人信息的安全。我们使用各种安全技术和程序来保护您的个人信息不被未经授权的访问、使用或泄漏。</p>
-<p>「轻弹幕」会在法律要求或符合「轻弹幕」的相关服务条款、软件许可使用协议约定的情况下透露您的个人信息，或者有充分理由相信必须这样做才能：</p>
-<p>满足法律或行政法规的明文规定，或者符合「轻弹幕」网站适用的法律程序；</p>
-<p>符合「轻弹幕」相关服务条款、软件许可使用协议的约定；</p>
-<p>保护「轻弹幕」的权利或财产，以及在紧急情况下保护「轻弹幕」员工、「轻弹幕」产品或服务的用户或大众的个人安全。</p>
-<p>「轻弹幕」不会未经您的允许将这些信息与第三方共享，本声明已经列出的上述情况除外。</p>
-<p>Cookie的使用</p>
-<p>使用 Cookie 能帮助您实现您的联机体验的个性化，您可以接受或拒绝 Cookie ，大多数 Web 浏览器会自动接受 Cookie，但您通常可根据自己的需要来修改浏览器的设置以拒绝 Cookie。</p>
-<p>「轻弹幕」有时会使用 Cookie 以便知道哪些网站受欢迎，使您在访问「轻弹幕」时能得到更好的服务。Cookie不会跟踪个人信息。</p>
-<p>当您注册「轻弹幕」时，「轻弹幕」亦会使用 Cookie。在这种情况下，「轻弹幕」会收集并存储有用信息，当您再次访问「轻弹幕」时，我们可辨认您的身份。来自「轻弹幕」的 Cookie 只能被「轻弹幕」读取。</p>
-<p>如果您的浏览器被设置为拒绝 Cookie，您仍然能够访问「轻弹幕」的大多数网页。</p>
-<p>关于免责说明</p>
-<p>就下列相关事宜的发生，「轻弹幕」不承担任何法律责任：</p>
-<p>由于您将用户密码告知他人或与他人共享注册帐户，由此导致的任何个人信息的泄漏，或其他非因「轻弹幕」原因导致的个人信息的泄漏；</p>
-<p>「轻弹幕」根据法律规定或政府相关政策要求提供您的个人信息；</p>
-<p>任何第三方根据「轻弹幕」各服务条款及声明中所列明的情况使用您的个人信息，由此所产生的纠纷；</p>
-<p>任何由于黑客攻击、电脑病毒侵入或政府管制而造成的暂时性网站关闭；</p>
-<p>因不可抗力导致的任何后果；</p>
-<p>「轻弹幕」在各服务条款及声明中列明的使用方式或免责情形。</p>
-<p>您的鼓励是我们前进的动力！</p>
-]]></content>
-      <tags>
-        <tag>隐私协议</tag>
       </tags>
   </entry>
   <entry>
@@ -1681,169 +1849,6 @@ AudioStreamBasicDescription是在使用AudioQueue进行语音录音时要传给A
 ]]></content>
       <tags>
         <tag>音视频</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>模式匹配之KMP算法详解</title>
-    <url>/2021/04/17/kmp/</url>
-    <content><![CDATA[<img src="/images/algorithm/1.png" width="700"/>
-<p>模式匹配分为单模式匹配和多模式匹配两种类型。</p>
-<p>单模式匹配就是给定一串文本，查找单个子串是否在文本中；<br />
-多模式匹配就是给定一串文本，查找多个子串是否在文本中；</p>
-<p>本文只介绍单模式匹配。</p>
-<h2 id="算法复杂度"><a class="markdownIt-Anchor" href="#算法复杂度"></a> 算法复杂度</h2>
-<p>假设给定的文本的长度为n，给定的子串的长度为m，判断子串是否在文本中。</p>
-<p>暴力算法</p>
-<blockquote>
-<p>算法复杂度为 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><mi>n</mi><mo>−</mo><mi>m</mi><mo>+</mo><mn>1</mn><mo stretchy="false">)</mo><mo>∗</mo><mi>m</mi></mrow><annotation encoding="application/x-tex">O(n - m + 1) * m</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="mopen">(</span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:0.66666em;vertical-align:-0.08333em;"></span><span class="mord mathnormal">m</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">1</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">∗</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:0.43056em;vertical-align:0em;"></span><span class="mord mathnormal">m</span></span></span></span></p>
-</blockquote>
-<p>KMP</p>
-<blockquote>
-<p>算法复杂度为 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><mi>n</mi><mo>+</mo><mi>m</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(n + m)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="mopen">(</span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">m</span><span class="mclose">)</span></span></span></span></p>
-</blockquote>
-<h2 id="kmp算法"><a class="markdownIt-Anchor" href="#kmp算法"></a> KMP算法</h2>
-<p>Knuth-Morris-Pratt算法（简称KMP）是最常用字符串匹配算法之一。<br />
-它以三个发明者命名，起头的那个K就是著名科学家Donald Knuth。</p>
-<p>KMP的核心就是构建失配信息，构建失配信息的核心就是查找 <strong>前缀和后缀最长共有元素</strong>这里后面会进行介绍。</p>
-<p>这里以文本“BBC ABCDAB ABCDABCDABDE”，子串“ABCDABD”的匹配过程为例来进行说明，<br />
-<img src="/images/algorithm/kmp1.png" width="400"/>首先第一步B和A不匹配，直接后移一位；</p>
-<p><img src="/images/algorithm/kmp2.png" width="400"/>第二步发现B和A也不匹配，再后移，直到匹配到第4位的A；</p>
-<p><img src="/images/algorithm/kmp3.png" width="400"/>从第4位开始，ABCDAB都是和子串部分相匹配。</p>
-<p><img src="/images/algorithm/kmp4.png" width="400"/>这个时候“D”字符无法继续匹配，按照一般的做法，我们会将子串后移一位，从下图的位置继续匹配。</p>
-<p><img src="/images/algorithm/kmp5.png" width="400"/>但是KMP并不是这么做的，KMP会直接向后移动4位,然后将文本的“ ”和子串的“C”进行匹配，这样直接减少了很多不必要的匹配操作；<br />
-<img src="/images/algorithm/kmp6.png" width="400"/></p>
-<h2 id="失配信息表"><a class="markdownIt-Anchor" href="#失配信息表"></a> 失配信息表</h2>
-<p>失配信息表是在匹配过程中出现失配情况的跳转依据，其核心思想就是<br />
-<strong>查找当前模式子串的前缀和后缀最长共有元素</strong></p>
-<p>首先，要了解两个概念：“前缀”和“后缀”。<br />
-“前缀”指除了最后一个字符以外，一个字符串的全部头部组合；<br />
-“后缀”指除了第一个字符以外，一个字符串的全部尾部组合。</p>
-<p>ABCDABD 的失配信息表如下</p>
-<table>
-<thead>
-<tr>
-<th style="text-align:center">失配字符</th>
-<th style="text-align:center">A</th>
-<th style="text-align:center">B</th>
-<th style="text-align:center">C</th>
-<th style="text-align:center">D</th>
-<th style="text-align:center">A</th>
-<th style="text-align:center">B</th>
-<th style="text-align:center">D</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:center">部分匹配值</td>
-<td style="text-align:center">0</td>
-<td style="text-align:center">0</td>
-<td style="text-align:center">0</td>
-<td style="text-align:center">0</td>
-<td style="text-align:center">1</td>
-<td style="text-align:center">2</td>
-<td style="text-align:center">0</td>
-</tr>
-</tbody>
-</table>
-<p>其构造的方式就是<code>按照查找当前已经匹配部分的前缀和后缀最长共有元素</code>,</p>
-<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line">- <span class="string">&quot;A&quot;</span>的前缀和后缀都为空集，共有元素的长度为<span class="number">0</span>；</span><br><span class="line">- <span class="string">&quot;AB&quot;</span>的前缀为[A]，后缀为[B]，共有元素的长度为<span class="number">0</span>；</span><br><span class="line">- <span class="string">&quot;ABC&quot;</span>的前缀为[A, AB]，后缀为[BC, C]，共有元素的长度<span class="number">0</span>；</span><br><span class="line">- <span class="string">&quot;ABCD&quot;</span>的前缀为[A, AB, ABC]，后缀为[BCD, CD, D]，共有元素的长度为<span class="number">0</span>；</span><br><span class="line">- <span class="string">&quot;ABCDA&quot;</span>的前缀为[A, AB, ABC, ABCD]，后缀为[BCDA, CDA, DA, A]，共有元素为<span class="string">&quot;A&quot;</span>，长度为<span class="number">1</span>；</span><br><span class="line">- <span class="string">&quot;ABCDAB&quot;</span>的前缀为[A, AB, ABC, ABCD, ABCDA]，后缀为[BCDAB, CDAB, DAB, AB, B]，共有元素为<span class="string">&quot;AB&quot;</span>，长度为<span class="number">2</span>；</span><br><span class="line">- <span class="string">&quot;ABCDABD&quot;</span>的前缀为[A, AB, ABC, ABCD, ABCDA, ABCDAB]，后缀为[BCDABD, CDABD, DABD, ABD, BD, D]，共有元素的长度为<span class="number">0</span>。</span><br></pre></td></tr></table></figure>
-<h2 id="失配跳转"><a class="markdownIt-Anchor" href="#失配跳转"></a> 失配跳转</h2>
-<img src="/images/algorithm/kmp4.png" width="400"/>
-在上面匹配过程中，在出现“D”字符失配的时候，直接往后移动了4位，移动规则如下
-<blockquote>
-<p>后移位数 = 已匹配的字符数 - 对应的部分匹配值</p>
-</blockquote>
-<p>即 后移位数 = 6(ABCDAB) - 2 = 4，进行跳转以后，使用&quot;C&quot;和当前文本位置的“ ”继续进行比较，这就是KMP算法匹配的跳转过程。<br />
-<img src="/images/algorithm/kmp6.png" width="400"/></p>
-<h2 id="代码实现"><a class="markdownIt-Anchor" href="#代码实现"></a> 代码实现</h2>
-<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">init_next</span><span class="params">(string pattern, <span class="type">int</span> next[])</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="type">unsigned</span> <span class="type">long</span> len = pattern.<span class="built_in">length</span>();</span><br><span class="line">    next[<span class="number">0</span>] = <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i = <span class="number">1</span>,k = <span class="number">0</span>; i &lt; len; i++) &#123;</span><br><span class="line">        <span class="keyword">while</span>(k &gt; <span class="number">0</span> &amp;&amp; pattern[k] != pattern[i]) &#123;</span><br><span class="line">            k = next[k - <span class="number">1</span>];</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span>(pattern[k] == pattern[i]) &#123;</span><br><span class="line">            k ++;</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        next[i] = k;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">search</span><span class="params">(string content, string pattern)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="type">int</span> next[pattern.<span class="built_in">length</span>()];</span><br><span class="line">    <span class="built_in">init_next</span>(pattern, next);</span><br><span class="line">    </span><br><span class="line">    <span class="type">int</span> i = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span> (i &lt;= content.<span class="built_in">length</span>() - pattern.<span class="built_in">length</span>()) &#123;</span><br><span class="line">        </span><br><span class="line">        <span class="type">int</span> j = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">for</span> (; j &lt; pattern.<span class="built_in">length</span>(); j ++) &#123;</span><br><span class="line">            <span class="keyword">if</span> (pattern[j] == content[i + j]) &#123;</span><br><span class="line">                <span class="keyword">continue</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            <span class="type">int</span> jump = j - next[j - <span class="number">1</span>];</span><br><span class="line">            i += <span class="built_in">MAX</span>(jump, <span class="number">1</span>);;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span> (j == pattern.<span class="built_in">length</span>()) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">const</span> <span class="type">char</span> * argv[])</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="type">bool</span> exist = <span class="built_in">search</span>(<span class="string">&quot;ABCDABCDABDE&quot;</span>, <span class="string">&quot;ABCDABD&quot;</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;kmp search exist:%u\n&quot;</span>, exist);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><a href="https://github.com/zhangdongxuan/CodeSlice/tree/master/algorithm/KMP/KMP">点击查看源码</a></p>
-<p>参考<br />
-<a href="http://www.ruanyifeng.com/blog/2013/05/Knuth%E2%80%93Morris%E2%80%93Pratt_algorithm.html">http://www.ruanyifeng.com/blog/2013/05/Knuth–Morris–Pratt_algorithm.html</a></p>
-]]></content>
-      <tags>
-        <tag>算法</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Socket Programming in C/C++</title>
-    <url>/2022/06/04/Socket-Programming-in-C-C/</url>
-    <content><![CDATA[<p><img src="/images/network/socket.jpeg" alt="" /></p>
-<h3 id="what-is-socket-programming"><a class="markdownIt-Anchor" href="#what-is-socket-programming"></a> What is socket programming?</h3>
-<p>Socket programming is a way of connecting two nodes on a network to communicate with each other. One socket(node) listens on a particular port at an IP, while the other socket reaches out to the other to form a connection. The server forms the listener socket while the client reaches out to the server.</p>
-<h3 id="state-diagram-for-server-and-client-model"><a class="markdownIt-Anchor" href="#state-diagram-for-server-and-client-model"></a> State diagram for server and client model</h3>
-<img src="/images/network/serverandclientmodel.png" width="400">
-<h3 id="stages-for-server"><a class="markdownIt-Anchor" href="#stages-for-server"></a> Stages for server</h3>
-<p><strong>1、socket creation:</strong></p>
-<pre><code>int sockfd = socket(domain, type, protocol)]
-</code></pre>
-<blockquote>
-<p><strong>sockfd:</strong> socket descriptor, an integer (like a file-handle)<br />
-<strong>1. domain:</strong> integer, specifies communication domain. We use AF_LOCAL as defined in the POSIX standard for communication between processes on the same host(most infomation see <a href="https://blog.csdn.net/frank_jb/article/details/77199834">https://blog.csdn.net/frank_jb/article/details/77199834</a>). For communicating between processes on different hosts connected by IPV4, we use AF_INET and AF_I NET 6 for processes connected by IPV6.<br />
-<strong>2. type:</strong> communication type<br />
-SOCK_STREAM: TCP(reliable, connection oriented)<br />
-SOCK_DGRAM: UDP(unreliable, connectionless)<br />
-<strong>3. protocol:</strong> Protocol value for Internet Protocol(IP), which is 0. This is the same number which appears on protocol field in the IP header of a packet.(man protocols for more details)</p>
-</blockquote>
-<p><strong>2、setsockopt:</strong> This helps in manipulating options for the socket referred by the file descriptor sockfd. This is completely optional, but it helps in reuse of address and port. Prevents error such as: “address already in use”.</p>
-<pre><code>int setsockopt(int sockfd, int level, int optname,  const void *optval, socklen_t optlen);
-</code></pre>
-<p><strong>3、Bind:</strong></p>
-<pre><code>int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-</code></pre>
-<p>After creation of the socket, bind function binds the socket to the address and port number specified in addr(custom data structure). In the example code, we bind the server to the localhost, hence we use INADDR_ANY to specify the IP address.</p>
-<p><strong>4、Listen:</strong></p>
-<pre><code>int listen(int sockfd, int backlog);
-</code></pre>
-<p>It puts the server socket in a passive mode, where it waits for the client to approach the server to make a connection. The backlog, defines the maximum length to which the queue of pending connections for sockfd may grow. If a connection request arrives when the queue is full, the client may receive an error with an indication of ECONNREFUSED.</p>
-<p><strong>5、Accept:</strong></p>
-<pre><code>int new_socket= accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
-</code></pre>
-<p>It extracts the first connection request on the queue of pending connections for the listening socket, sockfd, creates a new connected socket, and returns a new file descriptor referring to that socket. At this point, connection is established between client and server, and they are ready to transfer data.</p>
-<h2 id="stages-for-client"><a class="markdownIt-Anchor" href="#stages-for-client"></a> Stages for Client</h2>
-<p><strong>1、Socket connection:</strong> Exactly same as that of server’s socket creation<br />
-Connect:</p>
-<p><strong>2、The connect()</strong> system call connects the socket referred to by the file descriptor sockfd to the address specified by addr. Server’s address<br />
-and port is specified in addr.</p>
-<pre><code>int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-</code></pre>
-<h2 id="implementation"><a class="markdownIt-Anchor" href="#implementation"></a> Implementation</h2>
-<p>Here we are exchanging one hello message between server and client to demonstrate the client/server model.</p>
-<p>Server.c</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">//  Client.c</span></span><br><span class="line"><span class="comment">//  ServerTest</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">//  Created by disen zhang on 2022/6/8.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/socket.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;netinet/in.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> g_svfd;</span><br><span class="line"></span><br><span class="line"><span class="type">long</span> <span class="title function_">send_data_to_socket</span><span class="params">(<span class="type">int</span> socket)</span> &#123;</span><br><span class="line">    <span class="type">char</span> buf[<span class="number">1024</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    <span class="type">const</span> <span class="type">size_t</span> buf_size = <span class="keyword">sizeof</span>(buf) - <span class="number">1</span>;</span><br><span class="line">    <span class="built_in">snprintf</span>(buf, buf_size, <span class="string">&quot;Server Have Revc Your Connect, Bye.&quot;</span>);</span><br><span class="line">    <span class="type">long</span> sendLen = send(socket, buf, <span class="built_in">strlen</span>(buf), <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (sendLen == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Send Failed\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> sendLen;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">read_data_from_socket</span><span class="params">(<span class="type">int</span> sockfd)</span> &#123;</span><br><span class="line">    <span class="type">char</span> recv_data[<span class="number">1024</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    <span class="type">long</span> rc = recv(sockfd, recv_data, <span class="keyword">sizeof</span>(recv_data), <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (rc &lt;= <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Server Read Failed cs:%ld\n&quot;</span>, rc);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Server Revc:%s from sockfds:%d\n&quot;</span>, recv_data, sockfd);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">exit_server</span><span class="params">(<span class="type">void</span>)</span> &#123;</span><br><span class="line">    shutdown(g_svfd, SHUT_RDWR);</span><br><span class="line">    close(g_svfd);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;close server socket:%d\n&quot;</span>, g_svfd);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">start_server</span><span class="params">(<span class="type">int</span> port)</span> &#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_in</span> <span class="title">address</span>;</span></span><br><span class="line">    address.sin_family = AF_INET;</span><br><span class="line">    address.sin_addr.s_addr = INADDR_ANY;</span><br><span class="line">    address.sin_port = htons(port);</span><br><span class="line">    </span><br><span class="line">    </span><br><span class="line">    <span class="comment">// Creating socket file descriptor</span></span><br><span class="line">    <span class="keyword">if</span> ((g_svfd = socket(AF_INET, SOCK_STREAM, <span class="number">0</span>)) == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;socket failed\n&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Forcefully attaching socket to the port 8080</span></span><br><span class="line">    <span class="type">int</span> opt = <span class="number">1</span>;</span><br><span class="line">    <span class="type">int</span> ret = setsockopt(g_svfd, SOL_SOCKET, SO_KEEPALIVE, &amp;opt, <span class="keyword">sizeof</span>(opt));</span><br><span class="line">    <span class="keyword">if</span> (ret != <span class="number">0</span>) &#123;</span><br><span class="line">        perror(<span class="string">&quot;setsockopt&quot;</span>);</span><br><span class="line">        close(g_svfd);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-2</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// Forcefully attaching socket to the port 8080</span></span><br><span class="line">    <span class="keyword">if</span> (bind(g_svfd, (<span class="keyword">struct</span> sockaddr*)&amp;address, <span class="keyword">sizeof</span>(address)) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        perror(<span class="string">&quot;bind&quot;</span>);</span><br><span class="line">        close(g_svfd);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-3</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (listen(g_svfd, SOMAXCONN) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        perror(<span class="string">&quot;listen&quot;</span>);</span><br><span class="line">        close(g_svfd);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-4</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;server start with port:%d fd:%d\n&quot;</span>, port, g_svfd);</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> g_svfd;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">accept_client_conn</span><span class="params">(<span class="type">void</span>)</span> &#123;</span><br><span class="line">    <span class="type">int</span> sockfd = accept(g_svfd, <span class="literal">NULL</span>, <span class="literal">NULL</span>);</span><br><span class="line">    <span class="keyword">if</span> (sockfd &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        perror(<span class="string">&quot;accept&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    read_data_from_socket(sockfd);</span><br><span class="line">    send_data_to_socket(sockfd);</span><br><span class="line"></span><br><span class="line">    shutdown(sockfd, SHUT_RDWR);</span><br><span class="line">    close(sockfd);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> sockfd;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>main.c for Server</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;Server.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">on_exit</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">//do something when process exits</span></span><br><span class="line">    exit_server();</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;on_exit\n&quot;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> * argv[])</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (argc != <span class="number">2</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;please add port\n&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    atexit(on_exit);</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> port = atoi(argv[<span class="number">1</span>]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;port:%d\n&quot;</span>, port);</span><br><span class="line">    <span class="type">int</span> ret = start_server(port);</span><br><span class="line">    <span class="keyword">if</span> (ret &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;server start fail\n&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    accept_client_conn();</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>client.c</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">//  Client.c</span></span><br><span class="line"><span class="comment">//  ServerTest</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">//  Created by disen zhang on 2022/6/8.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;Client.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/socket.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;netinet/in.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;arpa/inet.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> g_socket;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">client_read_data_from_socket</span><span class="params">(<span class="type">int</span> sockfd)</span> &#123;</span><br><span class="line">    <span class="type">char</span> recv_data[<span class="number">1024</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    <span class="type">long</span> rc = recv(sockfd, recv_data, <span class="keyword">sizeof</span>(recv_data), <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (rc &lt;= <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Client Read Failed cs:%ld\n&quot;</span>, rc);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Client Socket acc:%d revc:%s\n&quot;</span>, sockfd, recv_data);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">long</span> <span class="title function_">send_data_from_socket</span><span class="params">(<span class="type">int</span> socket)</span> &#123;</span><br><span class="line">    <span class="type">char</span> buf[<span class="number">1024</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    <span class="type">const</span> <span class="type">size_t</span> buf_size = <span class="keyword">sizeof</span>(buf) - <span class="number">1</span>;</span><br><span class="line">    <span class="built_in">snprintf</span>(buf, buf_size, <span class="string">&quot;Client Send Data From Socket:%d&quot;</span>, socket);</span><br><span class="line">    <span class="type">long</span> sendLen = send(socket, buf, <span class="built_in">strlen</span>(buf), <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (sendLen == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Send Failed\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> sendLen;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">close_connect</span><span class="params">()</span> &#123;</span><br><span class="line">    shutdown(g_socket, SHUT_RDWR);</span><br><span class="line">    close(g_socket);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;close server socket:%d\n&quot;</span>, g_socket);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">start_connect</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *ip, <span class="type">int</span> port)</span> &#123;</span><br><span class="line">    g_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);</span><br><span class="line">    <span class="keyword">if</span> (g_socket &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Socket:%d Create Error\n&quot;</span>, g_socket);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="type">int</span> r = <span class="number">1</span>;</span><br><span class="line">    setsockopt(g_socket, SOL_SOCKET, SO_NOSIGPIPE, &amp;r, <span class="keyword">sizeof</span>(<span class="type">int</span>));</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// int timeoutMs = 100000;</span></span><br><span class="line">    <span class="comment">// __darwin_time_t tv_sec = timeoutMs / 1000;</span></span><br><span class="line">    <span class="comment">// __darwin_suseconds_t tv_usec = (timeoutMs % 1000) * 1000;</span></span><br><span class="line">    <span class="comment">// struct timeval tv = &#123;tv_sec, tv_usec&#125;;</span></span><br><span class="line">    <span class="comment">// setsockopt(g_socket, SOL_SOCKET, SO_SNDTIMEO, &amp;tv, sizeof(tv));</span></span><br><span class="line">    <span class="comment">// setsockopt(g_socket, SOL_SOCKET, SO_RCVTIMEO, &amp;tv, sizeof tv);</span></span><br><span class="line">    </span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">in_addr</span> <span class="title">addr</span>;</span></span><br><span class="line">    addr.s_addr = <span class="number">0</span>;</span><br><span class="line">    inet_pton(AF_INET, ip, &amp;addr);</span><br><span class="line"></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_in</span> <span class="title">to</span> =</span> &#123;<span class="number">0</span>&#125;;</span><br><span class="line">    to.sin_addr.s_addr = addr.s_addr;</span><br><span class="line">    to.sin_port = htons(port);</span><br><span class="line">    to.sin_family = AF_INET;</span><br><span class="line">    </span><br><span class="line">    <span class="type">long</span> rc = connect(g_socket, (<span class="keyword">struct</span> sockaddr*)&amp;to,<span class="keyword">sizeof</span>(to));</span><br><span class="line">    <span class="keyword">if</span> (rc &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Socket:%d Connect Failed\n&quot;</span>, g_socket);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    send_data_from_socket(g_socket);</span><br><span class="line">    client_read_data_from_socket(g_socket);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> g_socket;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>the main.c for Client</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;Client.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">on_exit</span><span class="params">(<span class="type">void</span>)</span> &#123;</span><br><span class="line">    <span class="comment">//do something when process exits</span></span><br><span class="line">    close_connect();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> * argv[])</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (argc != <span class="number">2</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;please add port\n&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    atexit(on_exit);</span><br><span class="line">    <span class="type">int</span> port = atoi(argv[<span class="number">1</span>]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;port:%d\n&quot;</span>, port);</span><br><span class="line"></span><br><span class="line">    start_connect(<span class="string">&quot;127.0.0.1&quot;</span>, port);</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>Source Code : <a href="https://github.com/zhangdongxuan/CodeSlice/tree/master/network/SampleSocket">https://github.com/zhangdongxuan/CodeSlice/tree/master/network/SampleSocket</a></p>
-<p><strong>Server:</strong></p>
-<pre><code>cmake CMakeLists.txt 
-make 
-./SocketServer 8080
-</code></pre>
-<p><strong>Client:</strong></p>
-<pre><code>cmake CMakeLists.txt 
-make 
-./SocketClient 8080
-</code></pre>
-<p><strong>Server Output:</strong></p>
-<pre><code>port:8080
-server start with port:8080 fd:3
-Server Revc:Client Send Data From Socket:3 from sockfds:4
-close server socket:3
-on_exit
-</code></pre>
-<p><strong>Client Output:</strong></p>
-<pre><code>port:8080
-Client Socket acc:3 revc:Server Have Revc Your Connect, Bye.
-close server socket:3
-</code></pre>
-<p><a href="https://www.ibm.com/docs/en/i/7.4?topic=designs-using-poll-instead-select">https://www.ibm.com/docs/en/i/7.4?topic=designs-using-poll-instead-select</a></p>
-]]></content>
-      <tags>
-        <tag>网络编程</tag>
       </tags>
   </entry>
 </search>
